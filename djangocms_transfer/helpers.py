@@ -41,12 +41,28 @@ def get_bound_plugins(plugins):
 
 
 def get_plugin_data(plugin, only_meta=False):
+    related_objects = defaultdict(list)
+    plugin_model = get_plugin_model(plugin.plugin_type)
+
     if only_meta:
         custom_data = None
     else:
         plugin_fields = get_plugin_fields(plugin.plugin_type)
-        _plugin_data = serializers.serialize(get_serializer_name(), (plugin,), fields=plugin_fields)[0]
-        custom_data = _plugin_data['fields']
+        plugins = serializers.serialize(get_serializer_name(), (plugin,), fields=plugin_fields)
+        if len(plugins) > 1:
+            # if the serializer returns multiple objects, handle them all
+            # we expect exactly one Plugin and all additional objects are related
+            for p in plugins:
+                if p.get('model') == plugin_model._meta.label_lower:
+                    custom_data = p['fields']
+                else:
+                    # figure out how the related field is called
+                    for rel in plugin_model._meta.related_objects:
+                        if rel.related_model._meta.label_lower == p['model']:
+                            # TODO: how can we get the _id suffix from the _meta API?
+                            related_objects[f'{rel.remote_field.name}_id'].append(p)
+        else:
+            custom_data = plugins[0]['fields']
 
     plugin_data = {
         'pk': plugin.pk,
@@ -55,5 +71,6 @@ def get_plugin_data(plugin, only_meta=False):
         'plugin_type': plugin.plugin_type,
         'parent_id': plugin.parent_id,
         'data': custom_data,
+        'related_objects': related_objects,
     }
     return plugin_data

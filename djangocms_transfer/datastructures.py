@@ -16,7 +16,7 @@ from .utils import get_plugin_model
 
 BaseArchivedPlugin = namedtuple(
     'ArchivedPlugin',
-    ['pk', 'creation_date', 'position', 'plugin_type', 'parent_id', 'data']
+    ['pk', 'creation_date', 'position', 'plugin_type', 'parent_id', 'data', 'related_objects']
 )
 
 ArchivedPlaceholder = namedtuple(
@@ -30,6 +30,11 @@ class ArchivedPlugin(BaseArchivedPlugin):
     @cached_property
     def model(self):
         return get_plugin_model(self.plugin_type)
+
+    @cached_property
+    def deserialized_related_objects(self):
+        for field_name, objects in self.related_objects.items():
+            yield field_name, list(deserialize(get_serializer_name(), objects))
 
     @cached_property
     def deserialized_instance(self):
@@ -63,5 +68,9 @@ class ArchivedPlugin(BaseArchivedPlugin):
             _d_instance.object.cmsplugin_ptr = plugin
             plugin.set_base_attr(_d_instance.object)
             _d_instance.save()
+            for field_name, _rel_objects in self.deserialized_related_objects:
+                for _rel_obj in _rel_objects:
+                    setattr(_rel_obj.object, field_name, _d_instance.object.pk)
+                    _rel_obj.save()
             return _d_instance.object
         return plugin
