@@ -98,7 +98,7 @@ class PluginExportForm(ExportImportForm):
     def get_filename(self):
         data = self.cleaned_data
         language = data['language']
-        page = data['page']
+        page = data['cms_page']
         plugin = data['plugin']
         placeholder = data['placeholder']
 
